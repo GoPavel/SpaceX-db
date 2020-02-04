@@ -1,0 +1,194 @@
+* Описание базы данных SpaceX
+
+** Additional Contraints
+   - Launchs.StaticFireDate < Launch.LaunchDate
+   - AttemptedLandings >= SuccessfulLandings
+
+** Запросы
+   - Последние запуски
+   - Ближайшие запланированные запуски
+   - Сколько ступеней успешно приземлились у заданного запуска
+   - Максимальное количество раз, которое переиспользовалось один core
+   - Самый успешный LandingPad и LaunchPad
+   - Сколько грузов доставлено для конкретной миссии
+   - Найти все полеты Core в упорядоченном виде
+   - Найти всех manufactorer для заданной mission
+
+** Notes
+*** Значения полей LaunchCore
+    - flight_number: int - номер полета конкретного core
+    - reuse: bool - переиспользуется ли этот core
+
+*** Объекты
+**** Capsules
+***** Meta
+      - capsule_serail: str
+        "C104"
+      - capsule_id: str
+        "dragon1"
+      - status: enum('retired', 'unknown', 'active')
+      - original_launch: str
+      - original_launch_unix: time
+      - mission: [mission?]
+      - landings: int
+        Count of landing
+      - type: str
+        "Dragon 1.0"
+      - reuse_count: int
+**** Cores 
+     Unit of engine
+***** Meta
+      - core_serail: str
+        "C104"
+      - block: 4
+      - status: enum('retired', 'unknown', 'active') + enum('expended', 'destroyed')
+      - original_launch: str
+      - original_launch_unix: time
+      - mission: [mission?]
+      - reuse_count: int
+      - rtls_attempts: int
+        RTLS = return to launch site
+      - rtls_landings: int
+      - asds_landings: int
+        ASDS - Autonomous spaceport drone ship 
+      - asds_landings: int
+      - water_landings: bool
+**** Dragons
+     Cargo spacecraft
+***** Meta
+      - id: str
+        "dragon1"
+      - name: str
+      - active: bool
+      - crew_capacity: int
+      - dry_mass_kg: int
+      - fist_flight: str
+      - heat_shield: dict
+      - thrusters: [dict]
+      - launch_payload_mass_kg: int
+      - return_payload_mass_kg: int
+**** Landing pads
+     Finish platform
+***** Meta
+      - id:
+      - name: str
+      - status: enum('retired', 'unknown', 'active', 'destroyed')
+      - location
+        - region: str
+        - lat\lon: double
+      - landing_type: enum('RTLS', 'ASDS')
+      - attempted_landings: int
+      - successful_landings: int
+**** Launches
+***** Meta
+      - flight_number: int
+      - mission_name: str
+      - mission_id: [?]
+      - upcoming: bool
+      - launch_time: ?
+        - local, unix, utc, year
+      - is_tentative: bool
+      - tentative_max_precision: enum('hour')
+      - rocket: Rocket
+      - launch_success: bool
+      - launch_site: Launch pad
+**** Launch pads
+     Start platform
+**** Missions
+**** Payloads
+**** Rockets
+**** DONT Roadster
+     Position of Elon's Tesls Roadster
+**** Ships
+     Support ships
+
+** TODO ERM to PDN
+*** EnumTypes
+    - CoreStatus(retired, unknown, active, expended, destroyed)
+    - LandingPadStatus(retired, unknown, active, destroyed)
+    - LandingType(RTLS, ASDS)
+    
+** Нормализация
+*** Rockets
+**** FD
+     Id -> #ALL
+     Name -> Id
+**** Keys
+     Id, Name
+**** 1НФ
+**** 2НФ
+     Ключ несоставной
+**** 3НФ
+**** НФБК
+**** 4НФ
+     Нет МЗ
+**** 5НФ
+     Все ключи простые, по теореме Дейта-Фейгина
+*** Cores, Missions, PayloadCustomers
+    Аналогичная ситуация, так как функциональный зависимости такие же.
+    Ключи Id (и Name если есть)
+*** Location
+**** FD
+     Id -> #ALL
+     (lat, lon) -> #ALL
+**** Keys
+     Id
+     (lat, lon)
+**** НФБК
+     По определению: в каждой нетривиальной фз левая часть является надключем.
+**** 4НФ
+     Есть простой ключ, Теорема Дейта-Фейгина.
+**** 5НФ
+     У нас только два аттрибута что-то могут определять, поэтому ЗВ у нас нет.
+*** LandingPads
+**** FD
+     Id -> #ALL
+     Name -> #ALL 
+     LocationId -> #ALL
+     Ключ есть, несоставной, покрывающий, поэтому 3 форма.
+     Все ключи (Id, Name, LocationId) простые, по теореме Дейта-Фейгина мы получаем 5НФ.
+*** LaunchPads
+    Аналогично с LandingPads
+*** LaunchCore
+**** FD
+     LaunchId CoreId -> #ALL
+**** Keys
+     (LaunchId, CoreId)
+**** НФБК
+     По определению: в каждой нетривиальной фз левая часть является надключем.
+**** 4НФ
+     Нет МЗ
+**** 5НФ
+     Нет ЗС
+*** Launches
+**** FD
+     Id -> #ALL
+     Id SomeLaunchCoreId -> #ALL (Тривиально выводится из первой)
+     SomePayloadId -> #ALL
+**** Keys
+     Id
+     SomePayloadId
+**** НФБК
+     По определению: в каждой нетривиальной фз левая часть является надключем.
+**** 4НФ и  5НФ
+     Все ключи простые, Теорема Дейта-Фейгина.
+*** Payloads
+**** FD
+     Id -> #ALL
+     Name -> #ALL
+**** Keys
+     Id
+     Name
+**** НФБК
+     По определению: в каждой нетривиальной фз левая часть является надключем.
+**** 4НФ и  5НФ
+     Все ключи простые, Теорема Дейта-Фейгина.
+
+*** PayloadBelonging
+     У нас только тривиальные => НФБК. Но ключ составной (PayloadId, CustomerId).
+     Так как у нас только два аттрибута, то нет нетривиальный МЗ, ЗС.
+     Значит 5НФ
+** SLQ Version
+    psql 11
+** schema (sql)
+    see =sql-scripts=
